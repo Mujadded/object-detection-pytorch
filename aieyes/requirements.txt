@@ -1,0 +1,14 @@
+numpy
+matplotlib
+scikit-image
+scikit-learn
+torch
+torchvision
+notebook
+pandas
+tqdm
+ultralytics
+seaborn
+transformers
+tesserocr
+opencv-python
