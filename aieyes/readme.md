@@ -1,4 +1,4 @@
-# Project Name
+# AI Eyes
 
 AIEyes - An AI powered visual aid for the visually impared.
 
@@ -21,7 +21,9 @@ Note: yolov5 project was cloned from [here](https://github.com/ultralytics/yolov
 Run the project using the following command:
 
 `python app.py --image source_image.jpg output_image.jpg`
+
 or
+
 `python app.py --video source_video.mp4 output_video.avi`
 
  
