@@ -14,6 +14,7 @@ Install the project dependencies using pip:
 `pip install -r requirements.txt`
 
 Note: The project was tested on MacOS. To run `tesserocr` tesseract wrapper on windows, please follow instructions [here](https://github.com/sirfz/tesserocr)
+
 Note: yolov5 project was cloned from [here](https://github.com/ultralytics/yolov5)
 
 ## Usage
