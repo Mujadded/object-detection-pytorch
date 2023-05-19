@@ -12,3 +12,4 @@ seaborn
 transformers
 tesserocr
 opencv-python
+imutils

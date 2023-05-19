@@ -1,7 +1,5 @@
 from dataclasses import dataclass
-from abc import ABC
 from enum import Enum
-from transformers import VisionEncoderDecoderModel, ViTImageProcessor, AutoTokenizer
 import cv2
 import torch
 from PIL import Image
@@ -10,7 +8,11 @@ from transformers import VisionEncoderDecoderModel, ViTImageProcessor, AutoToken
 import time
 from typing import Any
 from tesserocr import PyTessBaseAPI
+from imutils.video import VideoStream
+from imutils.video import FPS
+import imutils
 import argparse
+
 
 @dataclass
 class ObjectDetectionModel:
@@ -132,6 +134,36 @@ class VideoWriter:
         if self.writer:
             self.writer.release()
 
+@dataclass    
+class WebCamReader:
+        
+    def initialize(self):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.video_stream = VideoStream(src=0).start()
+        time.sleep(2.0)
+        self.fps = FPS().start()
+        self.height= 600
+        self.width= 800
+    
+    def next_frame(self):
+        frame = self.video_stream.read()
+        frame = imutils.resize(frame, width=self.width, height=self.height)
+        return frame
+
+    def is_running(self):
+        return True
+    
+    def close(self):
+        self.fps.stop()
+        cv2.destroyAllWindows()
+        self.video_stream.stop()
+        
+    def get_video_width(self):
+        return self.width
+    
+    def get_video_height(self):
+        return self.height
+
 def process_queue(futures, name):
     text = ''
     for i in range(len(futures)):
@@ -182,10 +214,11 @@ if __name__ == "__main__":
     # Add the --image and --video options
     parser.add_argument('--image', action='store_true', help='process an image')
     parser.add_argument('--video', action='store_true', help='process a video')
+    parser.add_argument('--webcam', action='store_true', help='process a video directly from webcam')
 
     # Add the source and save path arguments
-    parser.add_argument('source_path', help='path to the source image or video')
-    parser.add_argument('save_path', help='path to save the processed image or video')
+    parser.add_argument('--source_path', required=False, help='path to the source image or video')
+    parser.add_argument('--save_path', required=False, help='path to save the processed image or video')
 
     # Parse the command line arguments
     args = parser.parse_args()
@@ -215,15 +248,18 @@ if __name__ == "__main__":
         
         save_image(annotated_image, args.save_path)
           
-    elif args.video:
+    elif args.video or args.webcam:
         executor = ThreadPoolExecutor(max_workers=2)
         desc_futures, text_futures = [], []
         
-        video = VideoReader(args.source_path)   
-        video.initialize()
-        
-        video_writer = VideoWriter(args.save_path)
-        video_writer.initialize(width=video.get_video_width(), height=video.get_video_height())
+        if args.video:
+            video = VideoReader(args.source_path)                        
+            video_writer = VideoWriter(args.save_path)
+            video_writer.initialize(width=video.get_video_width(), height=video.get_video_height()) 
+        elif args.webcam:
+            video = WebCamReader()
+
+        video.initialize() 
         
         desc_text = ''
         ocr_text = ''
@@ -244,7 +280,7 @@ if __name__ == "__main__":
                 async_submit(executor, read_text, frame, text_futures)
             
             desc_text = update_text( desc_text, desc_futures, 'captions')
-            ocr_text = update_text( ocr_text, text_futures, 'ocr')
+            # ocr_text = update_text( ocr_text, text_futures, 'ocr')
             
             add_text_to_image(text='description: ' + desc_text, image=annotated_frame, yloc=frame.shape[0]-20)
             add_text_to_image(text='ocr-text: ' + ocr_text, image=annotated_frame, yloc=20)
@@ -256,6 +292,7 @@ if __name__ == "__main__":
         
                 
         video.close()
-        video_writer.close()
+        if args.video:
+            video_writer.close()
         cv2.destroyAllWindows()
     
