@@ -142,8 +142,8 @@ class WebCamReader:
         self.video_stream = VideoStream(src=0).start()
         time.sleep(2.0)
         self.fps = FPS().start()
-        self.height= 600
-        self.width= 800
+        self.height= 1152
+        self.width= 864
     
     def next_frame(self):
         frame = self.video_stream.read()
@@ -280,7 +280,7 @@ if __name__ == "__main__":
                 async_submit(executor, read_text, frame, text_futures)
             
             desc_text = update_text( desc_text, desc_futures, 'captions')
-            # ocr_text = update_text( ocr_text, text_futures, 'ocr')
+            ocr_text = update_text( ocr_text, text_futures, 'ocr')
             
             add_text_to_image(text='description: ' + desc_text, image=annotated_frame, yloc=frame.shape[0]-20)
             add_text_to_image(text='ocr-text: ' + ocr_text, image=annotated_frame, yloc=20)

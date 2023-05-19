@@ -21,10 +21,15 @@ Note: yolov5 project was cloned from [here](https://github.com/ultralytics/yolov
 
 Run the project using the following command:
 
-`python app.py --image source_image.jpg output_image.jpg`
+`python app.py --image --source_path source_image.jpg ---output_path output_image.jpg`
 
 or
 
-`python app.py --video source_video.mp4 output_video.avi`
+`python app.py --video --source_path source_video.mp4 --output_path output_video.avi`
+
+
+or
+
+`python app.py --webcam`
 
  
