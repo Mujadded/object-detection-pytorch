@@ -114,6 +114,12 @@ class VideoReader:
         if self.reader.isOpened():
             height = int(self.reader.get(cv2.CAP_PROP_FRAME_HEIGHT))
         return height
+    
+    def set_window_size(self, dims):
+        print(dims)
+        self.reader.set(cv2.CAP_PROP_FRAME_WIDTH, dims[0])
+        self.reader.set(cv2.CAP_PROP_FRAME_HEIGHT, dims[1])
+        
 
 @dataclass
 class VideoWriter:
@@ -162,8 +168,14 @@ def async_submit(executor, func, param, queue):
     future = executor.submit(func, param)
     queue.append((future, time.time()))
 
-def show(frame, title='frame'):
+def show(frame, title='frame', wait=False, dims=None):
+    if dims:
+        frame = cv2.resize(frame, dims)
     cv2.imshow(title, frame)
+
+    if wait:
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
 def interrupted():
     return cv2.waitKey(1) & 0xFF == ord('q')
@@ -174,21 +186,96 @@ def load_image(path):
 def save_image(image, path):
     cv2.imwrite(path, image)
     
+def process_video(source, save_path=None, window_size=None):
+    executor = ThreadPoolExecutor(max_workers=2)
+    desc_futures, text_futures = [], []
+    
+    video = VideoReader(source)   
+    video.initialize()
+    
+    # if window_size:
+    #     video.set_window_size(window_size)
+    
+    video_writer = None
+    if save_path:
+        video_writer = VideoWriter(save_path)
+        video_writer.initialize(width=video.get_video_width(), height=video.get_video_height())
+    
+    desc_text = ''
+    ocr_text = ''
+    interval = 25
+    frame_counter = 0
+    
+    while video.is_running():
+        frame = video.next_frame()
+        frame_counter += 1
+        
+        if frame is None:
+            break
+        
+        annotated_frame = object_detector(frame.copy())
+        
+        if frame_counter % interval == 0:
+            async_submit(executor, describe_scene, frame, desc_futures)
+            async_submit(executor, read_text, frame, text_futures)
+        
+        desc_text = update_text( desc_text, desc_futures, 'captions')
+        ocr_text = update_text( ocr_text, text_futures, 'ocr')
+        
+        add_text_to_image(text='description: ' + desc_text, image=annotated_frame, yloc=frame.shape[0]-20)
+        add_text_to_image(text='ocr-text: ' + ocr_text, image=annotated_frame, yloc=20)
+        
+        show(annotated_frame, dims=window_size)
+                
+        if save_path:
+            video_writer.write(annotated_frame)
+
+        if interrupted():
+            break
+    
+    video.close()
+    if video_writer:
+        video_writer.close()
+    cv2.destroyAllWindows()
+    
+def process_image(source, save_path=None):
+    image = load_image(source)
+    annotated_image = object_detector(image.copy())
+    desc = scene_descriptor(image)
+    text = text_reader(image)
+    
+    print(f'Description: {desc}')
+    print(f'OCR Result: {text}')
+    
+    add_text_to_image(text='description: ' + desc[0], image=annotated_image, yloc=image.shape[0]-20)
+    add_text_to_image(text='ocr-text: ' + text, image=annotated_image, yloc=20)
+    
+    show(annotated_image, wait=True)
+    if save_path:
+        save_image(annotated_image, save_path)
+
 if __name__ == "__main__":
 
     # Create an argument parser
     parser = argparse.ArgumentParser(description='Process some images or videos.')
 
     # Add the --image and --video options
-    parser.add_argument('--image', action='store_true', help='process an image')
-    parser.add_argument('--video', action='store_true', help='process a video')
+    parser.add_argument('-i', '--image', action='store_true', help='process an image')
+    parser.add_argument('-v', '--video', action='store_true', help='process a video')
+    parser.add_argument('-c', '--camera', action='store_true', help='process live webcam feed')
+    parser.add_argument('-s', '--save', action='store_true', help='save output')
 
     # Add the source and save path arguments
-    parser.add_argument('source_path', help='path to the source image or video')
-    parser.add_argument('save_path', help='path to save the processed image or video')
+    parser.add_argument('source_path', help='path to the source image or video', nargs='?')
+    parser.add_argument('save_path', help='path to save the processed image or video', nargs='?')
+    parser.add_argument('--width', help='window width if using --camera')
+    parser.add_argument('--height', help='window height if using --camera')
 
     # Parse the command line arguments
     args = parser.parse_args()
+    
+    if args.camera:
+        args.save_path = args.source_path
     
     factory = ModelFactory()
     object_detector = factory.build( ModelType.OBJECT_DETECTION )
@@ -202,60 +289,24 @@ if __name__ == "__main__":
         return text_reader(image)
     
     if args.image:
-        image = load_image(args.source_path)
-        annotated_image = object_detector(image.copy())
-        desc = scene_descriptor(image)
-        text = text_reader(image)
-        
-        print(f'Description: {desc}')
-        print(f'OCR Result: {text}')
-        
-        add_text_to_image(text='description: ' + desc[0], image=annotated_image, yloc=image.shape[0]-20)
-        add_text_to_image(text='ocr-text: ' + text, image=annotated_image, yloc=20)
-        
-        save_image(annotated_image, args.save_path)
-          
+        if args.save:
+            process_image(args.source_path, args.save_path)
+        else:
+            process_image(args.source_path)
     elif args.video:
-        executor = ThreadPoolExecutor(max_workers=2)
-        desc_futures, text_futures = [], []
-        
-        video = VideoReader(args.source_path)   
-        video.initialize()
-        
-        video_writer = VideoWriter(args.save_path)
-        video_writer.initialize(width=video.get_video_width(), height=video.get_video_height())
-        
-        desc_text = ''
-        ocr_text = ''
-        interval = 25
-        frame_counter = 0
-        
-        while video.is_running():
-            frame = video.next_frame()
-            frame_counter += 1
+        if args.save:
+            process_video(args.source_path, args.save_path)
+        else:
+            process_video(args.source_path)
+    elif args.camera:
+        if args.save:
+            if args.width and args.height:
+                process_video(0, args.save_path, window_size=(args.width, args.height))
+            else:
+                process_video(0, args.save_path)
+        else:
+            if args.width and args.height:
+                process_video(0, window_size=(int(args.width), int(args.height)))
+            else:
+                process_video(0)
             
-            if frame is None:
-                break
-            
-            annotated_frame = object_detector(frame.copy())
-            
-            if frame_counter % interval == 0:
-                async_submit(executor, describe_scene, frame, desc_futures)
-                async_submit(executor, read_text, frame, text_futures)
-            
-            desc_text = update_text( desc_text, desc_futures, 'captions')
-            ocr_text = update_text( ocr_text, text_futures, 'ocr')
-            
-            add_text_to_image(text='description: ' + desc_text, image=annotated_frame, yloc=frame.shape[0]-20)
-            add_text_to_image(text='ocr-text: ' + ocr_text, image=annotated_frame, yloc=20)
-            
-            show(annotated_frame)
-            
-            if interrupted():
-                break
-        
-                
-        video.close()
-        video_writer.close()
-        cv2.destroyAllWindows()
-    
