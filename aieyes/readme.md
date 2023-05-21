@@ -19,22 +19,26 @@ Note: yolov5 project was cloned from [here](https://github.com/ultralytics/yolov
 
 ## Usage
 
-Run the project using the following commands, to run the system on
-
-A single image:
-
-`python app.py --image <source.jpg>` (display only)
-`python app.py --image --save <source.jpg> <destination.jpg>` (display and save result)
-
-Video file:
-
-`python app.py --video <source.mp4>` (display only)
-`python app.py --video --save <source.mp4> <destination.avi>` (display and save result)
+Run the project using the following commands, to run the system from -
 
 Webcam:
 
 `python app.py --camera` (display only)
+
 `python app.py --camera --save <destination.avi>` (display and save result)
+
 `python app.py --camera --width <integer> --height <integer>` (display with specified window size)
+
+A single image source:
+
+`python app.py --image <source.jpg>` (display only)
+
+`python app.py --image --save <source.jpg> <destination.jpg>` (display and save result)
+
+A video file source:
+
+`python app.py --video <source.mp4>` (display only)
+
+`python app.py --video --save <source.mp4> <destination.avi>` (display and save result)
 
  
