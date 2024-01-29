@@ -44,10 +44,10 @@ def process_video(source, save_path=None, window_size=None):
             async_submit(executor, read_text, frame, text_futures)
         
         desc_text = update_text( desc_text, desc_futures, 'captions')
-        ocr_text = update_text( ocr_text, text_futures, 'ocr')
+        # ocr_text = update_text( ocr_text, text_futures, 'ocr')
         
         add_text_to_image(text='description: ' + desc_text, image=annotated_frame, yloc=frame.shape[0]-20)
-        add_text_to_image(text='ocr-text: ' + ocr_text, image=annotated_frame, yloc=20)
+        # add_text_to_image(text='ocr-text: ' + ocr_text, image=annotated_frame, yloc=20)
         
         show(annotated_frame, dims=window_size)
                 
