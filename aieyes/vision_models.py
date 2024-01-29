@@ -4,8 +4,7 @@ from enum import Enum
 from typing import Any
 from dataclasses import dataclass
 from tesserocr import PyTessBaseAPI
-from transformers import VisionEncoderDecoderModel, ViTImageProcessor, AutoTokenizer
-from transformers import VisionEncoderDecoderModel, ViTImageProcessor, AutoTokenizer
+from transformers import VisionEncoderDecoderModel, ViTImageProcessor, AutoTokenizer, AutoProcessor, AutoModelForCausalLM
 
 @dataclass
 class ObjectDetectionModel:
@@ -27,10 +26,18 @@ class ObjectDetectionModel:
 class ImageCaptioningModel:
     
     name: str = None
-    path: str = "nlpconnect/vit-gpt2-image-captioning"
-    preprocessor: Any = ViTImageProcessor.from_pretrained(path)
-    model : Any = VisionEncoderDecoderModel.from_pretrained(path)
-    postprocessor: Any = AutoTokenizer.from_pretrained(path)
+
+    def __post_init__(self):
+        if(self.name == 'GIT-ms'):
+            self.path = "microsoft/git-base-coco"
+            self.preprocessor = AutoProcessor.from_pretrained(self.path)
+            self.model = AutoModelForCausalLM.from_pretrained(self.path)
+            self.postprocessor = self.preprocessor
+        elif(self.name == 'ViT-gpt2'):
+            self.path = "nlpconnect/vit-gpt2-image-captioning"
+            self.preprocessor = ViTImageProcessor.from_pretrained(self.path)
+            self.model = VisionEncoderDecoderModel.from_pretrained(self.path)
+            self.postprocessor = AutoTokenizer.from_pretrained(self.path)
     
     def __call__(self,data):
         preprocessed_data = self.preprocess(data)
@@ -39,16 +46,27 @@ class ImageCaptioningModel:
         return result
     
     def generate_caption(self, data):
-        return self.model.generate(data)
+        if self.name == 'ViT-gpt2':
+            caption = self.model.generate(data)
+        elif self.name == 'GIT-ms':
+            caption = self.model.generate(pixel_values=data, max_length=50)
+        return caption
     
     def preprocess(self, data):
-        return self.preprocessor(data, return_tensors='pt').pixel_values
+        if self.name == 'ViT-gpt2':
+            pixel_values = self.preprocessor(data, return_tensors='pt').pixel_values
+        elif self.name == 'GIT-ms':
+            pixel_values = self.preprocessor(images=data, return_tensors='pt').pixel_values
+        return pixel_values
     
     def postprocess(self, data):
         output = self.postprocessor.batch_decode(data, skip_special_tokens=True)
-        output = [word.strip() for word in output]
+        if self.name == 'ViT-gpt2':
+            output = [word.strip() for word in output]
+        elif self.name == 'GIT-ms':
+            output = output[0]
         return output
-    
+
 @dataclass 
 class OCRModel:
     name : str = 'tesseract-ocr'
